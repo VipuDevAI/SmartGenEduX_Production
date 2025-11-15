@@ -181,14 +181,9 @@
   --shadow-lg: 0px 10px 15px -3px hsl(0 0% 0% / 0.30), 0px 4px 6px -4px hsl(0 0% 0% / 0.20);
   --shadow-xl: 0px 20px 25px -5px hsl(0 0% 0% / 0.40), 0px 8px 10px -6px hsl(0 0% 0% / 0.20);
   --shadow-2xl: 0px 25px 50px -12px hsl(0 0% 0% / 0.50);
-
 }
 
 @layer base {
-  * {
-    @apply border-border;
-  }
-
   body {
     @apply font-sans antialiased bg-background text-foreground;
   }
@@ -248,10 +243,8 @@
     pointer-events: none;
     position: absolute;
     inset: 0px;
-    /*border-radius: inherit;   match rounded corners */
     border-radius: inherit;
     z-index: -1;
-    /* sits behind content but above backdrop */
   }
 
   .toggle-elevate.toggle-elevated::before {
@@ -280,10 +273,8 @@
     pointer-events: none;
     position: absolute;
     inset: 0px;
-    /*border-radius: inherit;   match rounded corners */
     border-radius: inherit;
     z-index: 999;
-    /* sits in front of content */
   }
 
   .hover-elevate:hover:not(.no-default-hover-elevate)::after,
