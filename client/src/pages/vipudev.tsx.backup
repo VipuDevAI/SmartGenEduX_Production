@@ -1,0 +1,335 @@
+import { useEffect, useState } from "react";
+import { useAuth } from "@/hooks/useAuth";
+import { useToast } from "@/hooks/use-toast";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Textarea } from "@/components/ui/textarea";
+import { Brain, Send, Plus, MessageSquare, Code, Loader2 } from "lucide-react";
+import { useQuery, useMutation } from "@tanstack/react-query";
+import { apiRequest, queryClient } from "@/lib/queryClient";
+import type { Conversation, Message } from "@shared/schema";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Badge } from "@/components/ui/badge";
+import { Skeleton } from "@/components/ui/skeleton";
+import { isUnauthorizedError } from "@/lib/authUtils";
+
+export default function VipuDev() {
+  const { toast } = useToast();
+  const { isAuthenticated, isLoading: authLoading, isSuperAdmin } = useAuth();
+  const [selectedConversationId, setSelectedConversationId] = useState<number | null>(null);
+  const [messageInput, setMessageInput] = useState("");
+
+  useEffect(() => {
+    if (!authLoading && !isSuperAdmin) {
+      toast({
+        title: "Access Denied",
+        description: "VipuDev.AI is only available to Super Admins.",
+        variant: "destructive",
+      });
+    }
+  }, [authLoading, isSuperAdmin, toast]);
+
+  const { data: conversations, isLoading: conversationsLoading } = useQuery<Conversation[]>({
+    queryKey: ["/api/conversations"],
+    enabled: isSuperAdmin,
+  });
+
+  const { data: messages, isLoading: messagesLoading } = useQuery<Message[]>({
+    queryKey: ["/api/conversations", selectedConversationId, "messages"],
+    enabled: !!selectedConversationId,
+  });
+
+  const createConversationMutation = useMutation({
+    mutationFn: async () => {
+      return await apiRequest("POST", "/api/conversations", {
+        title: `Conversation ${new Date().toLocaleString()}`,
+      });
+    },
+    onSuccess: (data: Conversation) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/conversations"] });
+      setSelectedConversationId(data.id);
+      toast({
+        title: "New Conversation",
+        description: "Started a new conversation with VipuDev.AI",
+      });
+    },
+    onError: (error: Error) => {
+      if (isUnauthorizedError(error)) {
+        toast({
+          title: "Unauthorized",
+          description: "You are logged out. Logging in again...",
+          variant: "destructive",
+        });
+        setTimeout(() => {
+          window.location.href = "/api/login";
+        }, 500);
+        return;
+      }
+      toast({
+        title: "Error",
+        description: "Failed to create conversation",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const sendMessageMutation = useMutation({
+    mutationFn: async (content: string) => {
+      return await apiRequest("POST", `/api/conversations/${selectedConversationId}/messages`, {
+        content,
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({
+        queryKey: ["/api/conversations", selectedConversationId, "messages"],
+      });
+      setMessageInput("");
+    },
+    onError: (error: Error) => {
+      if (isUnauthorizedError(error)) {
+        toast({
+          title: "Unauthorized",
+          description: "You are logged out. Logging in again...",
+          variant: "destructive",
+        });
+        setTimeout(() => {
+          window.location.href = "/api/login";
+        }, 500);
+        return;
+      }
+      toast({
+        title: "Error",
+        description: "Failed to send message. Make sure an AI provider is configured.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const handleSendMessage = () => {
+    if (!messageInput.trim() || !selectedConversationId) return;
+    sendMessageMutation.mutate(messageInput);
+  };
+
+  if (!isSuperAdmin) {
+    return (
+      <div className="p-6">
+        <Card>
+          <CardHeader>
+            <CardTitle>Access Restricted</CardTitle>
+            <CardDescription>
+              VipuDev.AI is only available to Super Admin users
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <p className="text-muted-foreground">
+              You need Super Admin privileges to access the AI development assistant.
+            </p>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  return (
+    <div className="h-[calc(100vh-4rem)] flex">
+      {/* Conversation List */}
+      <div className="w-80 border-r border-border flex flex-col">
+        <div className="p-4 border-b border-border">
+          <Button
+            className="w-full"
+            onClick={() => createConversationMutation.mutate()}
+            disabled={createConversationMutation.isPending}
+            data-testid="button-new-conversation"
+          >
+            {createConversationMutation.isPending ? (
+              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+            ) : (
+              <Plus className="w-4 h-4 mr-2" />
+            )}
+            New Conversation
+          </Button>
+        </div>
+
+        <ScrollArea className="flex-1">
+          <div className="p-2 space-y-1">
+            {conversationsLoading ? (
+              <>
+                <Skeleton className="h-16 w-full mb-2" />
+                <Skeleton className="h-16 w-full mb-2" />
+                <Skeleton className="h-16 w-full mb-2" />
+              </>
+            ) : conversations && conversations.length > 0 ? (
+              conversations.map((conv) => (
+                <button
+                  key={conv.id}
+                  onClick={() => setSelectedConversationId(conv.id)}
+                  className={`w-full text-left p-3 rounded-md hover-elevate active-elevate-2 ${
+                    selectedConversationId === conv.id
+                      ? "bg-accent text-accent-foreground"
+                      : ""
+                  }`}
+                  data-testid={`conversation-${conv.id}`}
+                >
+                  <div className="flex items-start gap-2">
+                    <MessageSquare className="w-4 h-4 mt-0.5 flex-shrink-0" />
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium truncate">{conv.title}</p>
+                      <p className="text-xs text-muted-foreground">
+                        {new Date(conv.createdAt).toLocaleDateString()}
+                      </p>
+                    </div>
+                  </div>
+                </button>
+              ))
+            ) : (
+              <div className="p-4 text-center text-muted-foreground text-sm">
+                No conversations yet. Start a new one!
+              </div>
+            )}
+          </div>
+        </ScrollArea>
+      </div>
+
+      {/* Chat Area */}
+      <div className="flex-1 flex flex-col">
+        {selectedConversationId ? (
+          <>
+            <div className="p-4 border-b border-border">
+              <div className="flex items-center gap-2">
+                <Brain className="w-5 h-5 text-primary" />
+                <h2 className="text-lg font-semibold">VipuDev.AI Assistant</h2>
+                <Badge variant="outline" className="ml-auto">Super Admin Only</Badge>
+              </div>
+              <p className="text-sm text-muted-foreground mt-1">
+                AI-powered development assistant for code generation, debugging, and deployment
+              </p>
+            </div>
+
+            <ScrollArea className="flex-1 p-6">
+              <div className="max-w-4xl mx-auto space-y-4">
+                {messagesLoading ? (
+                  <>
+                    <Skeleton className="h-24 w-3/4" />
+                    <Skeleton className="h-24 w-3/4 ml-auto" />
+                  </>
+                ) : messages && messages.length > 0 ? (
+                  messages.map((msg) => (
+                    <div
+                      key={msg.id}
+                      className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}
+                    >
+                      <div
+                        className={`max-w-2xl rounded-lg p-4 ${
+                          msg.role === "user"
+                            ? "bg-primary text-primary-foreground"
+                            : "bg-card border border-card-border"
+                        }`}
+                      >
+                        <div className="flex items-start gap-2 mb-2">
+                          {msg.role === "assistant" && (
+                            <Brain className="w-4 h-4 mt-0.5 flex-shrink-0" />
+                          )}
+                          <p className="text-xs font-medium">
+                            {msg.role === "user" ? "You" : "VipuDev.AI"}
+                          </p>
+                        </div>
+                        <p className="text-sm whitespace-pre-wrap">{msg.content}</p>
+                        {msg.codePreview && (
+                          <div className="mt-3 p-3 bg-background/50 rounded border border-border">
+                            <div className="flex items-center gap-2 mb-2">
+                              <Code className="w-3 h-3" />
+                              <span className="text-xs font-medium">Generated Code</span>
+                            </div>
+                            <pre className="text-xs font-mono overflow-x-auto">
+                              {msg.codePreview}
+                            </pre>
+                          </div>
+                        )}
+                        <p className="text-xs opacity-70 mt-2">
+                          {new Date(msg.createdAt).toLocaleTimeString()}
+                        </p>
+                      </div>
+                    </div>
+                  ))
+                ) : (
+                  <div className="text-center py-12">
+                    <Brain className="w-16 h-16 mx-auto text-muted-foreground mb-4" />
+                    <h3 className="text-lg font-medium mb-2">Start a conversation</h3>
+                    <p className="text-sm text-muted-foreground max-w-md mx-auto">
+                      Ask VipuDev.AI to help you generate code, debug issues, create modules,
+                      or get suggestions for your ERP system.
+                    </p>
+                  </div>
+                )}
+              </div>
+            </ScrollArea>
+
+            <div className="p-4 border-t border-border">
+              <div className="max-w-4xl mx-auto flex gap-2">
+                <Textarea
+                  placeholder="Ask VipuDev.AI anything... (e.g., 'Create an attendance module' or 'Help me debug the user login')"
+                  value={messageInput}
+                  onChange={(e) => setMessageInput(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" && !e.shiftKey) {
+                      e.preventDefault();
+                      handleSendMessage();
+                    }
+                  }}
+                  className="min-h-[80px]"
+                  data-testid="input-message"
+                />
+                <Button
+                  onClick={handleSendMessage}
+                  disabled={!messageInput.trim() || sendMessageMutation.isPending}
+                  size="icon"
+                  className="h-[80px] w-[80px]"
+                  data-testid="button-send"
+                >
+                  {sendMessageMutation.isPending ? (
+                    <Loader2 className="w-5 h-5 animate-spin" />
+                  ) : (
+                    <Send className="w-5 h-5" />
+                  )}
+                </Button>
+              </div>
+            </div>
+          </>
+        ) : (
+          <div className="flex-1 flex items-center justify-center p-6">
+            <Card className="max-w-md">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Brain className="w-6 h-6 text-primary" />
+                  Welcome to VipuDev.AI
+                </CardTitle>
+                <CardDescription>
+                  Your AI-powered development assistant
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <p className="text-sm text-muted-foreground mb-4">
+                  Select an existing conversation from the sidebar or create a new one to
+                  start working with VipuDev.AI.
+                </p>
+                <Button
+                  className="w-full"
+                  onClick={() => createConversationMutation.mutate()}
+                  disabled={createConversationMutation.isPending}
+                  data-testid="button-start-conversation"
+                >
+                  {createConversationMutation.isPending ? (
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  ) : (
+                    <Plus className="w-4 h-4 mr-2" />
+                  )}
+                  Start New Conversation
+                </Button>
+              </CardContent>
+            </Card>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
