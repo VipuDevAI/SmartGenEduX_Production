@@ -1,24 +1,20 @@
 // Set Vercel environment variable BEFORE importing
-// Don't override NODE_ENV - let Vercel set it
 process.env.VERCEL = '1';
-
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-// CRITICAL: Import from source TypeScript, not built JavaScript
-// Vercel will bundle this automatically
-import { initPromise } from '../server/index';
-
-// Cache the initialized app (only if successful)
+// Cache the initialized app
 let appReady: any = null;
 let initError: any = null;
-
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   try {
-    // Wait for app initialization on first request
+    // Initialize app on first request
     if (!appReady && !initError) {
       try {
+        // Import from the compiled server bundle (tsup output)
+        const { initPromise } = await import('../dist/server/index.js');
         appReady = await initPromise;
-        console.log('Express app initialized successfully');
+        console.log('Express app initialized successfully on Vercel');
       } catch (error) {
+        console.error('App initialization error:', error);
         initError = error;
         throw error;
       }
@@ -29,7 +25,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       throw initError;
     }
     
-    // Now the app has all routes registered
+    // Handle the request with Express app
     return appReady(req, res);
   } catch (error: any) {
     console.error('Serverless handler error:', error);
