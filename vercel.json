@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "buildCommand": "npm run build",
+  "buildCommand": "vite build && esbuild server/index.ts --platform=node --bundle --format=esm --outdir=dist --external:@neondatabase/serverless --external:bcrypt",
   "installCommand": "npm install",
   "outputDirectory": "dist/public",
   "rewrites": [
