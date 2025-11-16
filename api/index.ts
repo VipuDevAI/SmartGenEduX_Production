@@ -12,10 +12,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     // Initialize app on first request
     if (!appReady && !initError) {
       try {
-        // Dynamic import to let Vercel bundle everything
-        const { initPromise } = await import('../server/index.js');
+        // Import from the BUILT bundle, not source TypeScript
+        const { initPromise } = await import('../dist/index.js');
         appReady = await initPromise;
-        console.log('Express app initialized successfully');
+        console.log('Express app initialized successfully on Vercel');
       } catch (error) {
         console.error('App initialization error:', error);
         initError = error;
