@@ -1,4 +1,6 @@
 import { defineConfig } from 'tsup';
+import { resolve } from 'path';
+
 export default defineConfig({
   entry: ['server/index.ts'],
   format: ['esm'],
@@ -19,5 +21,10 @@ export default defineConfig({
   noExternal: [
     /^@shared\/.*/
   ],
-  tsconfig: 'tsconfig.json'
+  esbuildOptions(options) {
+    // Resolve path aliases without requiring tsconfig.json
+    options.alias = {
+      '@shared': resolve('./shared')
+    };
+  }
 });
