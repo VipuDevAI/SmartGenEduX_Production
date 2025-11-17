@@ -16,7 +16,9 @@ export default defineConfig({
     'lightningcss',
     'esbuild',
     '@babel/preset-typescript',
-    'drizzle-kit'
+    'drizzle-kit',
+    'rollup',
+    'vite'
   ],
   noExternal: [
     /^@shared\/.*/
