@@ -1,9 +1,12 @@
 // Set Vercel environment variable BEFORE importing
 process.env.VERCEL = '1';
+
 import type { VercelRequest, VercelResponse } from '@vercel/node';
+
 // Cache the initialized app
 let appReady: any = null;
 let initError: any = null;
+
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   try {
     // Initialize app on first request
